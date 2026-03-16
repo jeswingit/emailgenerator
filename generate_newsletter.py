@@ -37,9 +37,9 @@ DEFAULT_MONTH = "March"
 
 # Email configuration with styling defaults
 EMAIL_CONFIG = {
-    "from": "ACIA EMEA Newsletter <newsletter@acia-emea.com>",
-    "to": "acia@acia.com",
-    "subject": "ACIA EMEA - Good to Know | {month} {year}",
+    "from": "ADIA EMEA Newsletter <newsletter@adia-emea.com>",
+    "to": "adia@adia.com",
+    "subject": "ADIA EMEA - Good to Know | {month} {year}",
     "colors": {
         "background": "#EEF6F7",
         "white": "#ffffff",
@@ -206,7 +206,7 @@ _GENERAL_DIVIDER = (
 # ---------------------------------------------------------------------------
 
 def _build_header_section(config: dict) -> str:
-    """Build the header section with ACIA EMEA branding and grey banner."""
+    """Build the header section with ADIA EMEA branding and grey banner."""
     colors = config["colors"]
     sizes = config["sizes"]
     return (
@@ -221,7 +221,7 @@ def _build_header_section(config: dict) -> str:
         "                <td width=\"200\" valign=\"middle\" style=\"padding:18px 16px 18px 14px;"
         f"background-color:{colors['header_bg']};\">\n"
         "                  <div style=\"font-size:22px;font-weight:bold;color:#1a1a1a;"
-        "letter-spacing:0.5px;line-height:1.2;\">ACIA EMEA</div>\n"
+        "letter-spacing:0.5px;line-height:1.2;\">ADIA EMEA</div>\n"
         "                  <div style=\"font-size:13px;color:#555555;margin-top:4px;"
         "font-style:italic;\">Good to Know</div>\n"
         "                </td>\n"
@@ -249,7 +249,7 @@ def _build_footer_section(config: dict) -> str:
         "        <tr>\n"
         f"          <td style=\"padding:16px 28px;background-color:{colors['footer_bg']};text-align:center;\">\n"
         f"            <div style=\"font-size:11px;color:{colors['text_footer']};line-height:1.5;\">"
-        f"&copy; {current_year} ACIA EMEA &bull; All rights reserved</div>\n"
+        f"&copy; {current_year} ADIA EMEA &bull; All rights reserved</div>\n"
         f"            <div style=\"font-size:11px;color:{colors['text_muted']};margin-top:4px;\">\n"
         f"              <a href=\"#\" style=\"color:{colors['red_accent']};text-decoration:none;\">"
         "Unsubscribe</a>\n"
@@ -389,7 +389,7 @@ def build_html_email(grouped_data: dict[str, list[dict]], month_name: str,
         "<head>\n"
         "<meta charset=\"UTF-8\">\n"
         "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n"
-        "<title>ACIA EMEA - Good to Know</title>\n"
+        "<title>ADIA EMEA - Good to Know</title>\n"
         "</head>\n"
         f"<body style=\"margin:0;padding:0;background-color:{colors['background']};"
         f"font-family:{fonts['family']};\">\n"
@@ -445,7 +445,7 @@ def build_eml_message(html_content: str, from_addr: str, to_addr: str,
         msg["Date"] = date_str
     else:
         msg["Date"] = datetime.now().strftime("%a, %d %b %Y %H:%M:%S +0000")
-    msg["Message-ID"] = f"<acia-emea-goodtoknow-{datetime.now().strftime('%Y%m%d')}@acia.emea>"
+    msg["Message-ID"] = f"<adia-emea-goodtoknow-{datetime.now().strftime('%Y%m%d')}@adia.emea>"
     msg["From"] = from_addr
     msg["To"] = to_addr
     msg["Subject"] = subject
