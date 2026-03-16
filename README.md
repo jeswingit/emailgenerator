@@ -29,6 +29,22 @@ pip install openpyxl
 
 ## Usage
 
+### Graphical User Interface (Recommended)
+
+Launch the GUI application:
+```bash
+python newsletter_gui.py
+```
+
+The GUI provides an easy-to-use interface for:
+- Selecting Excel files via file browser
+- Choosing the month from a dropdown menu
+- Configuring email addresses and subject
+- Selecting output file location
+- Viewing real-time generation status
+
+### Command Line Interface
+
 Basic usage:
 ```bash
 python generate_newsletter.py
