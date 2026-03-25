@@ -149,9 +149,10 @@ def _save_the_date_row(data: str) -> str:
 
 
 def _product_block(title: str, data: str, creator: str,
-                   image_cid: str | None) -> str:
+                   image_cid: str | None, background_color: str | None = None) -> str:
     t = html_module.escape(title)
     d = html_module.escape(data)
+    bg_style = f"background-color:{background_color};" if background_color else ""
     img_html = (
         f"            <img src=\"cid:{image_cid}\" alt=\"{t}\" "
         "style=\"display:block;max-width:100%;height:auto;margin-bottom:10px;\" />\n"
@@ -164,7 +165,7 @@ def _product_block(title: str, data: str, creator: str,
     )
     return (
         "        <tr>\n"
-        "          <td style=\"padding:16px 28px 8px 28px;\">\n"
+        f"          <td style=\"padding:16px 28px 8px 28px;{bg_style}\">\n"
         f"            <div style=\"font-size:16px;font-weight:bold;color:#1a1a1a;"
         f"margin-bottom:8px;\">{t}</div>\n"
         + img_html
@@ -173,18 +174,19 @@ def _product_block(title: str, data: str, creator: str,
         + creator_html
         + "          </td>\n"
           "        </tr>\n"
-          "        <tr><td style=\"height:1px;background-color:#eeeeee;"
+          f"        <tr><td style=\"height:1px;background-color:#eeeeee;{bg_style}"
           "font-size:0;line-height:0;\">&nbsp;</td></tr>"
     )
 
 
-def _general_block(title: str, data: str, is_last: bool) -> str:
+def _general_block(title: str, data: str, is_last: bool, background_color: str | None = None) -> str:
     t = html_module.escape(title)
     d = html_module.escape(data)
     pad = "22px 28px 28px 28px" if is_last else "22px 28px 6px 28px"
+    bg_style = f"background-color:{background_color};" if background_color else ""
     return (
         "        <tr>\n"
-        f"          <td style=\"padding:{pad};\">\n"
+        f"          <td style=\"padding:{pad};{bg_style}\">\n"
         f"            <div style=\"font-size:14px;font-weight:bold;color:#1a1a1a;"
         f"margin-bottom:8px;\">{t}</div>\n"
         f"            <div style=\"font-size:13px;color:#444444;"
@@ -204,6 +206,33 @@ _GENERAL_DIVIDER = (
 # ---------------------------------------------------------------------------
 # Dynamic HTML Builder
 # ---------------------------------------------------------------------------
+
+DEFAULT_LAYOUT: list[str] = [
+    "Header",
+    "Month News",
+    "Save the Date",
+    "General Information",
+    "General",
+    "Footer",
+]
+
+
+def _resolve_block_bg(block_id: str, config: dict, block_bg_colors: dict[str, str] | None) -> str | None:
+    """
+    Return the background color for a block type.
+    If block_bg_colors provides an override, it wins; otherwise defaults are used.
+    """
+    colors = config["colors"]
+    defaults: dict[str, str] = {
+        "Month News": colors.get("white", "#ffffff"),
+        "Save the Date": colors.get("save_date_bg", "#E5EFF0"),
+        "General Information": colors.get("white", "#ffffff"),
+        "General": colors.get("white", "#ffffff"),
+    }
+    if block_bg_colors and block_id in block_bg_colors and block_bg_colors[block_id]:
+        return block_bg_colors[block_id]
+    return defaults.get(block_id)
+
 
 def _build_header_section(config: dict) -> str:
     """Build the header section with ADIA EMEA branding and grey banner."""
@@ -263,7 +292,9 @@ def _build_footer_section(config: dict) -> str:
 
 
 def build_html_email(grouped_data: dict[str, list[dict]], month_name: str,
-                     config: dict, image_cids: dict[str, str]) -> str:
+                     config: dict, image_cids: dict[str, str],
+                     layout: list[str] | None = None,
+                     block_bg_colors: dict[str, str] | None = None) -> str:
     """
     Build the complete HTML email structure dynamically.
     
@@ -279,108 +310,108 @@ def build_html_email(grouped_data: dict[str, list[dict]], month_name: str,
     colors = config["colors"]
     fonts = config["fonts"]
     sizes = config["sizes"]
-    
-    # Build header
-    header = _build_header_section(config)
-    
-    # Build Month News section
-    month_news_html = ""
-    month_rows = grouped_data.get("Month News", [])
-    if month_rows:
-        rows_html = "\n".join(_month_news_row(r["data"]) for r in month_rows)
-        month_news_html = (
-            "\n"
-            f"        <!-- WHAT'S GOING ON IN {month_name.upper()} -->\n"
-            "        <tr>\n"
-            "          <td style=\"padding:24px 28px 8px 28px;\">\n"
-            f"            <div style=\"font-size:16px;font-weight:bold;color:#1a1a1a;"
-            f"margin-bottom:14px;padding-bottom:6px;border-bottom:1px solid {colors['divider']};\">"
-            f"What&#39;s going on in {html_module.escape(month_name)}...</div>\n"
-            "            <table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\">\n"
-            + rows_html + "\n"
-            "            </table>\n"
-            "          </td>\n"
-            "        </tr>\n"
-            "\n"
-            f"        <!-- DIVIDER -->\n"
-            f"        <tr><td style=\"height:1px;background-color:{colors['divider']};"
-            "font-size:0;line-height:0;\">&nbsp;</td></tr>"
-        )
-    
-    # Build Save the Date section
-    save_date_html = ""
-    std_rows = grouped_data.get("Save the Date", [])
-    if std_rows:
-        rows_html = "\n".join(_save_the_date_row(r["data"]) for r in std_rows)
-        save_date_html = (
-            "\n"
-            "        <!-- SAVE THE DATE -->\n"
-            "        <tr>\n"
-            f"          <td style=\"padding:20px 28px 8px 28px;background-color:{colors['save_date_bg']};\">\n"
-            f"            <div style=\"font-size:15px;font-weight:bold;color:{colors['red_accent']};"
-            "margin-bottom:12px;\">Save the Date!</div>\n"
-            "            <table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\">\n"
-            + rows_html + "\n"
-            "            </table>\n"
-            "          </td>\n"
-            "        </tr>\n"
-            "\n"
-            f"        <!-- DIVIDER -->\n"
-            f"        <tr><td style=\"height:1px;background-color:{colors['border']};"
-            "font-size:0;line-height:0;\">&nbsp;</td></tr>"
-        )
-    
-    # Build General Information section
-    general_info_html = ""
-    product_rows = grouped_data.get("Product", [])
-    if product_rows:
-        blocks = []
-        for row in product_rows:
-            # Get CID for this image if it exists
-            image_path = row.get("image")
-            cid = image_cids.get(image_path) if image_path else None
-            blocks.append(_product_block(row["title"], row["data"], row["creator"], cid))
-        
-        general_info_html = (
-            "\n"
-            "        <!-- GENERAL INFORMATION HEADING -->\n"
-            "        <tr>\n"
-            "          <td style=\"padding:28px 28px 10px 28px;\">\n"
-            "            <div style=\"font-size:24px;font-weight:bold;color:#1a1a1a;"
-            "letter-spacing:0.3px;\">General Information</div>\n"
-            "          </td>\n"
-            "        </tr>\n"
-            "\n"
-            "        <!-- GENERAL INFO DIVIDER LINE -->\n"
-            f"        <tr><td style=\"height:2px;background-color:{colors['divider']};"
-            "margin:0 28px;font-size:0;line-height:0;\">&nbsp;</td></tr>\n"
-            "\n"
-            "        <!-- GENERAL INFORMATION BODY -->\n"
-            + "\n".join(blocks)
-        )
-    
-    # Build General subheadings section
-    general_subheadings_html = ""
-    general_rows = grouped_data.get("General", [])
-    if general_rows:
-        blocks = []
-        for i, row in enumerate(general_rows):
-            is_last = (i == len(general_rows) - 1)
-            blocks.append(_general_block(row["title"], row["data"], is_last))
-            if not is_last:
-                blocks.append(_GENERAL_DIVIDER)
-        
-        general_subheadings_html = (
-            "\n"
-            f"        <!-- DIVIDER -->\n"
-            f"        <tr><td style=\"height:1px;background-color:{colors['divider']};"
-            "font-size:0;line-height:0;\">&nbsp;</td></tr>\n"
-            "\n"
-            + "\n".join(blocks)
-        )
-    
-    # Build footer
-    footer = _build_footer_section(config)
+
+    layout_to_render = layout[:] if layout else DEFAULT_LAYOUT[:]
+
+    def render_block(block_id: str) -> str:
+        if block_id == "Header":
+            return _build_header_section(config)
+        if block_id == "Footer":
+            return _build_footer_section(config)
+
+        bg = _resolve_block_bg(block_id, config, block_bg_colors)
+        bg_style = f"background-color:{bg};" if bg else ""
+
+        if block_id == "Month News":
+            month_rows = grouped_data.get("Month News", [])
+            if not month_rows:
+                return ""
+            rows_html = "\n".join(_month_news_row(r["data"]) for r in month_rows)
+            return (
+                "\n"
+                f"        <!-- WHAT'S GOING ON IN {month_name.upper()} -->\n"
+                "        <tr>\n"
+                f"          <td style=\"padding:24px 28px 8px 28px;{bg_style}\">\n"
+                f"            <div style=\"font-size:16px;font-weight:bold;color:#1a1a1a;"
+                f"margin-bottom:14px;padding-bottom:6px;border-bottom:1px solid {colors['divider']};\">"
+                f"What&#39;s going on in {html_module.escape(month_name)}...</div>\n"
+                "            <table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\">\n"
+                + rows_html + "\n"
+                "            </table>\n"
+                "          </td>\n"
+                "        </tr>\n"
+                "\n"
+                f"        <!-- DIVIDER -->\n"
+                f"        <tr><td style=\"height:1px;background-color:{colors['divider']};{bg_style}"
+                "font-size:0;line-height:0;\">&nbsp;</td></tr>"
+            )
+
+        if block_id == "Save the Date":
+            std_rows = grouped_data.get("Save the Date", [])
+            if not std_rows:
+                return ""
+            rows_html = "\n".join(_save_the_date_row(r["data"]) for r in std_rows)
+            return (
+                "\n"
+                "        <!-- SAVE THE DATE -->\n"
+                "        <tr>\n"
+                f"          <td style=\"padding:20px 28px 8px 28px;{bg_style}\">\n"
+                f"            <div style=\"font-size:15px;font-weight:bold;color:{colors['red_accent']};"
+                "margin-bottom:12px;\">Save the Date!</div>\n"
+                "            <table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\">\n"
+                + rows_html + "\n"
+                "            </table>\n"
+                "          </td>\n"
+                "        </tr>\n"
+                "\n"
+                f"        <!-- DIVIDER -->\n"
+                f"        <tr><td style=\"height:1px;background-color:{colors['border']};{bg_style}"
+                "font-size:0;line-height:0;\">&nbsp;</td></tr>"
+            )
+
+        if block_id == "General Information":
+            product_rows = grouped_data.get("Product", [])
+            if not product_rows:
+                return ""
+            blocks: list[str] = []
+            for row in product_rows:
+                image_path = row.get("image")
+                cid = image_cids.get(image_path) if image_path else None
+                blocks.append(_product_block(row["title"], row["data"], row["creator"], cid, bg))
+            return (
+                "\n"
+                "        <!-- GENERAL INFORMATION HEADING -->\n"
+                "        <tr>\n"
+                f"          <td style=\"padding:28px 28px 10px 28px;{bg_style}\">\n"
+                "            <div style=\"font-size:24px;font-weight:bold;color:#1a1a1a;"
+                "letter-spacing:0.3px;\">General Information</div>\n"
+                "          </td>\n"
+                "        </tr>\n"
+                "\n"
+                "        <!-- GENERAL INFO DIVIDER LINE -->\n"
+                f"        <tr><td style=\"height:2px;background-color:{colors['divider']};{bg_style}"
+                "margin:0 28px;font-size:0;line-height:0;\">&nbsp;</td></tr>\n"
+                "\n"
+                "        <!-- GENERAL INFORMATION BODY -->\n"
+                + "\n".join(blocks)
+            )
+
+        if block_id == "General":
+            general_rows = grouped_data.get("General", [])
+            if not general_rows:
+                return ""
+            blocks: list[str] = []
+            for i, row in enumerate(general_rows):
+                is_last = (i == len(general_rows) - 1)
+                blocks.append(_general_block(row["title"], row["data"], is_last, bg))
+                if not is_last:
+                    blocks.append(_GENERAL_DIVIDER)
+            return "\n" + "\n".join(blocks)
+
+        return ""
+
+    rendered_blocks = [render_block(block_id) for block_id in layout_to_render]
+    rendered = "".join(b for b in rendered_blocks if b)
     
     # Assemble complete HTML
     html = (
@@ -399,12 +430,7 @@ def build_html_email(grouped_data: dict[str, list[dict]], month_name: str,
         f"    <td align=\"center\" valign=\"top\" style=\"padding:20px 10px;background-color:{colors['background']};\">\n"
         f"      <table width=\"{sizes['table_width']}\" cellpadding=\"0\" cellspacing=\"0\" "
         f"border=\"0\" bgcolor=\"{colors['white']}\" style=\"background-color:{colors['white']} !important;border:1px solid {colors['border']};\">\n"
-        + header
-        + month_news_html
-        + save_date_html
-        + general_info_html
-        + general_subheadings_html
-        + footer
+        + rendered
         + "\n"
         "      </table>\n"
         "    </td>\n"
@@ -413,7 +439,6 @@ def build_html_email(grouped_data: dict[str, list[dict]], month_name: str,
         "</body>\n"
         "</html>"
     )
-    
     return html
 
 
@@ -523,7 +548,7 @@ def main():
     # ------------------------------------------------------------------
     image_cids: dict[str, str] = {}  # Maps image path to CID
     image_parts: dict[str, object] = {}  # Maps image path to MIMEImage part
-    
+
     # Collect all unique image paths from Product rows
     product_rows = grouped.get("Product", [])
     for row in product_rows:
@@ -543,16 +568,15 @@ def main():
     # ------------------------------------------------------------------
     # 4. Build EML message
     # ------------------------------------------------------------------
-    # Determine subject
     if args.subject:
         subject = args.subject
     else:
         current_year = datetime.now().year
         subject = EMAIL_CONFIG["subject"].format(month=args.month, year=current_year)
-    
-    from_addr = getattr(args, 'from')
+
+    from_addr = getattr(args, "from")
     msg = build_eml_message(html, from_addr, args.to, subject)
-    
+
     # Attach images
     for image_path, img_part in image_parts.items():
         msg.attach(img_part)

@@ -7,7 +7,7 @@ Provides a simple GUI to upload Excel files and configure newsletter parameters.
 """
 
 import tkinter as tk
-from tkinter import ttk, filedialog, messagebox, scrolledtext
+from tkinter import ttk, filedialog, messagebox, scrolledtext, colorchooser
 from pathlib import Path
 import sys
 from datetime import datetime
@@ -39,6 +39,21 @@ class NewsletterGUI:
         self.from_email = tk.StringVar(value=EMAIL_CONFIG["from"])
         self.to_email = tk.StringVar(value=EMAIL_CONFIG["to"])
         self.subject = tk.StringVar(value="")
+
+        # Layout customization
+        self.available_blocks = [
+            "Month News",
+            "Save the Date",
+            "General Information",
+            "General",
+        ]
+        self.enabled_blocks: list[str] = self.available_blocks[:]
+        self.block_bg_colors: dict[str, str] = {
+            "Month News": EMAIL_CONFIG["colors"].get("white", "#ffffff"),
+            "Save the Date": EMAIL_CONFIG["colors"].get("save_date_bg", "#E5EFF0"),
+            "General Information": EMAIL_CONFIG["colors"].get("white", "#ffffff"),
+            "General": EMAIL_CONFIG["colors"].get("white", "#ffffff"),
+        }
         
         self.setup_ui()
         
@@ -138,6 +153,61 @@ class NewsletterGUI:
             foreground="gray"
         ).grid(row=row+1, column=1, columnspan=2, sticky=tk.W, padx=5)
         row += 2
+
+        # Layout / Color customization
+        layout_frame = ttk.LabelFrame(main_frame, text="Layout & Block Colors", padding="10")
+        layout_frame.grid(row=row, column=0, columnspan=3, sticky=(tk.W, tk.E), pady=(5, 10))
+        layout_frame.columnconfigure(0, weight=1)
+        layout_frame.columnconfigure(1, weight=0)
+        layout_frame.columnconfigure(2, weight=1)
+
+        ttk.Label(layout_frame, text="Enabled blocks (order matters):").grid(
+            row=0, column=0, sticky=tk.W, pady=(0, 5)
+        )
+
+        self.blocks_listbox = tk.Listbox(layout_frame, height=6, exportselection=False)
+        self.blocks_listbox.grid(row=1, column=0, sticky=(tk.W, tk.E), padx=(0, 10))
+        for b in self.enabled_blocks:
+            self.blocks_listbox.insert(tk.END, b)
+
+        buttons_col = ttk.Frame(layout_frame)
+        buttons_col.grid(row=1, column=1, sticky=(tk.N))
+
+        ttk.Button(buttons_col, text="Up", width=10, command=self.move_block_up).grid(row=0, column=0, pady=2)
+        ttk.Button(buttons_col, text="Down", width=10, command=self.move_block_down).grid(row=1, column=0, pady=2)
+
+        add_remove = ttk.Frame(buttons_col)
+        add_remove.grid(row=2, column=0, pady=(10, 0))
+        self.add_block_choice = tk.StringVar(value=self.available_blocks[0])
+        ttk.Combobox(
+            add_remove,
+            textvariable=self.add_block_choice,
+            values=self.available_blocks,
+            width=18,
+            state="readonly",
+        ).grid(row=0, column=0, pady=2)
+        ttk.Button(add_remove, text="Add", width=10, command=self.add_block).grid(row=1, column=0, pady=2)
+        ttk.Button(add_remove, text="Remove", width=10, command=self.remove_block).grid(row=2, column=0, pady=2)
+
+        colors_col = ttk.Frame(layout_frame)
+        colors_col.grid(row=1, column=2, sticky=(tk.W, tk.E))
+        ttk.Label(colors_col, text="Background colors (per block type):").grid(row=0, column=0, sticky=tk.W)
+
+        self.color_buttons: dict[str, ttk.Button] = {}
+        for i, block_id in enumerate(self.available_blocks, start=1):
+            row_frame = ttk.Frame(colors_col)
+            row_frame.grid(row=i, column=0, sticky=(tk.W, tk.E), pady=2)
+            ttk.Label(row_frame, text=block_id, width=20).grid(row=0, column=0, sticky=tk.W)
+            btn = ttk.Button(
+                row_frame,
+                text=self.block_bg_colors.get(block_id, "#ffffff"),
+                width=12,
+                command=lambda bid=block_id: self.choose_block_color(bid),
+            )
+            btn.grid(row=0, column=1, sticky=tk.W, padx=(6, 0))
+            self.color_buttons[block_id] = btn
+
+        row += 1
         
         # Status/Log Area
         ttk.Label(main_frame, text="Status:", font=("Arial", 10, "bold")).grid(
@@ -177,6 +247,61 @@ class NewsletterGUI:
         # Initial status message
         self.log("Welcome to ADIA EMEA Newsletter Generator")
         self.log("Please select an Excel file and configure the parameters.")
+
+    def _sync_enabled_blocks_from_listbox(self):
+        self.enabled_blocks = list(self.blocks_listbox.get(0, tk.END))
+
+    def move_block_up(self):
+        sel = self.blocks_listbox.curselection()
+        if not sel:
+            return
+        idx = sel[0]
+        if idx <= 0:
+            return
+        item = self.blocks_listbox.get(idx)
+        self.blocks_listbox.delete(idx)
+        self.blocks_listbox.insert(idx - 1, item)
+        self.blocks_listbox.selection_set(idx - 1)
+        self._sync_enabled_blocks_from_listbox()
+
+    def move_block_down(self):
+        sel = self.blocks_listbox.curselection()
+        if not sel:
+            return
+        idx = sel[0]
+        if idx >= self.blocks_listbox.size() - 1:
+            return
+        item = self.blocks_listbox.get(idx)
+        self.blocks_listbox.delete(idx)
+        self.blocks_listbox.insert(idx + 1, item)
+        self.blocks_listbox.selection_set(idx + 1)
+        self._sync_enabled_blocks_from_listbox()
+
+    def add_block(self):
+        block_id = self.add_block_choice.get()
+        existing = set(self.blocks_listbox.get(0, tk.END))
+        if block_id in existing:
+            return
+        self.blocks_listbox.insert(tk.END, block_id)
+        self._sync_enabled_blocks_from_listbox()
+
+    def remove_block(self):
+        sel = self.blocks_listbox.curselection()
+        if not sel:
+            return
+        idx = sel[0]
+        self.blocks_listbox.delete(idx)
+        self._sync_enabled_blocks_from_listbox()
+
+    def choose_block_color(self, block_id: str):
+        initial = self.block_bg_colors.get(block_id, "#ffffff")
+        color = colorchooser.askcolor(color=initial, title=f"Choose background color for {block_id}")
+        if not color or not color[1]:
+            return
+        self.block_bg_colors[block_id] = color[1]
+        btn = self.color_buttons.get(block_id)
+        if btn is not None:
+            btn.config(text=color[1])
         
     def browse_xlsx(self):
         """Open file dialog to select Excel file."""
@@ -261,7 +386,17 @@ class NewsletterGUI:
             
             # 3. Build HTML content
             self.log("\nBuilding HTML email structure...")
-            html = build_html_email(grouped, self.month.get(), EMAIL_CONFIG, image_cids)
+            layout = ["Header"] + (self.enabled_blocks[:] if self.enabled_blocks else []) + ["Footer"]
+            # Only pass colors for enabled blocks
+            block_bg_colors = {k: v for k, v in self.block_bg_colors.items() if k in self.enabled_blocks}
+            html = build_html_email(
+                grouped,
+                self.month.get(),
+                EMAIL_CONFIG,
+                image_cids,
+                layout=layout,
+                block_bg_colors=block_bg_colors,
+            )
             self.log(f"Built HTML email structure with {len(grouped)} section type(s).")
             
             # 4. Build EML message

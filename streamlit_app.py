@@ -12,6 +12,8 @@ import tempfile
 import os
 from datetime import datetime
 
+from streamlit_sortables import sort_items
+
 # Import functions from generate_newsletter.py
 from generate_newsletter import (
     read_excel_rows,
@@ -117,6 +119,59 @@ def main():
             value=EMAIL_CONFIG["to"],
             help="Recipient email address"
         )
+
+        st.subheader("Layout")
+
+        available_blocks = [
+            "Month News",
+            "Save the Date",
+            "General Information",
+            "General",
+        ]
+
+        default_enabled_blocks = [b for b in available_blocks if b != "Save the Date"] + ["Save the Date"]
+        enabled_blocks = st.multiselect(
+            "Enabled blocks:",
+            options=available_blocks,
+            default=default_enabled_blocks,
+            help="Select which blocks to include in the newsletter. Drag to reorder below.",
+        )
+
+        # Keep a stable list for sortables to avoid runtime add/remove glitches
+        if "layout_blocks" not in st.session_state:
+            st.session_state.layout_blocks = enabled_blocks[:]
+        # If enabled blocks changed, reset ordering to the enabled set in current order
+        if set(st.session_state.layout_blocks) != set(enabled_blocks):
+            st.session_state.layout_blocks = enabled_blocks[:]
+
+        if st.session_state.layout_blocks:
+            st.caption("Drag and drop to reorder blocks.")
+            ordered_blocks = sort_items(
+                st.session_state.layout_blocks,
+                direction="vertical",
+                key="newsletter_layout_sort",
+            )
+            # `sort_items` returns a new ordered list; persist it
+            st.session_state.layout_blocks = ordered_blocks
+        else:
+            ordered_blocks = []
+
+        st.subheader("Block Background Colors")
+        default_bg = {
+            "Month News": EMAIL_CONFIG["colors"].get("white", "#ffffff"),
+            "Save the Date": EMAIL_CONFIG["colors"].get("save_date_bg", "#E5EFF0"),
+            "General Information": EMAIL_CONFIG["colors"].get("white", "#ffffff"),
+            "General": EMAIL_CONFIG["colors"].get("white", "#ffffff"),
+        }
+        block_bg_colors: dict[str, str] = {}
+        for block_id in available_blocks:
+            if block_id not in enabled_blocks:
+                continue
+            block_bg_colors[block_id] = st.color_picker(
+                f"{block_id} background",
+                value=default_bg.get(block_id, "#ffffff"),
+                key=f"bg_{block_id}",
+            )
         
         # Subject (optional)
         use_custom_subject = st.checkbox("Use custom subject", value=False)
@@ -204,7 +259,9 @@ def main():
             
             if preview_button:
                 preview_email(uploaded_file, selected_month, from_email, to_email, 
-                            custom_subject if use_custom_subject else None)
+                            custom_subject if use_custom_subject else None,
+                            ordered_blocks,
+                            block_bg_colors)
             
             if generate_button:
                 generate_newsletter(
@@ -213,7 +270,9 @@ def main():
                     from_email,
                     to_email,
                     custom_subject if use_custom_subject else None,
-                    output_filename
+                    output_filename,
+                    ordered_blocks,
+                    block_bg_colors
                 )
     
     with col2:
@@ -256,7 +315,8 @@ def main():
             st.info(st.session_state.status)
 
 
-def generate_newsletter(uploaded_file, month, from_email, to_email, custom_subject, output_filename):
+def generate_newsletter(uploaded_file, month, from_email, to_email, custom_subject, output_filename,
+                        ordered_blocks: list[str], block_bg_colors: dict[str, str]):
     """Generate the newsletter from uploaded Excel file."""
     
     status_container = st.container()
@@ -310,7 +370,15 @@ def generate_newsletter(uploaded_file, month, from_email, to_email, custom_subje
         status_text.info("🏗️ Building HTML email structure...")
         progress_bar.progress(70)
         
-        html = build_html_email(grouped, month, EMAIL_CONFIG, image_cids)
+        layout = ["Header"] + (ordered_blocks[:] if ordered_blocks else []) + ["Footer"]
+        html = build_html_email(
+            grouped,
+            month,
+            EMAIL_CONFIG,
+            image_cids,
+            layout=layout,
+            block_bg_colors=block_bg_colors,
+        )
         status_text.info(f"✅ Built HTML with {len(grouped)} section type(s)")
         progress_bar.progress(80)
         
@@ -383,7 +451,8 @@ def generate_newsletter(uploaded_file, month, from_email, to_email, custom_subje
         st.session_state.status = f"❌ Error: {str(e)}"
 
 
-def preview_email(uploaded_file, month, from_email, to_email, custom_subject):
+def preview_email(uploaded_file, month, from_email, to_email, custom_subject,
+                  ordered_blocks: list[str], block_bg_colors: dict[str, str]):
     """Preview the newsletter HTML before generating."""
     try:
         with st.spinner("Generating preview..."):
@@ -408,7 +477,15 @@ def preview_email(uploaded_file, month, from_email, to_email, custom_subject):
                         image_parts[row["image"]] = img_part
             
             # Build HTML content
-            html = build_html_email(grouped, month, EMAIL_CONFIG, image_cids)
+            layout = ["Header"] + (ordered_blocks[:] if ordered_blocks else []) + ["Footer"]
+            html = build_html_email(
+                grouped,
+                month,
+                EMAIL_CONFIG,
+                image_cids,
+                layout=layout,
+                block_bg_colors=block_bg_colors,
+            )
             
             # Determine subject
             if custom_subject and custom_subject.strip():

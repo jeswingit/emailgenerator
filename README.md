@@ -15,12 +15,17 @@ This tool reads an Excel file with newsletter content and generates a profession
   - **Save the Date**: Event announcements
   - **Product**: Product spotlight cards with images
   - **General**: Informational blocks
+- Customizable layout (UI):
+  - Enable/disable blocks per newsletter
+  - Reorder blocks (Streamlit: drag-and-drop; Tkinter: up/down controls)
+  - Customize background color per block type
 
 ## Requirements
 
 - Python 3.x
 - openpyxl library
 - streamlit (for web interface)
+ - streamlit-sortables (for drag-and-drop block ordering in the Streamlit UI)
 
 ## Installation
 
